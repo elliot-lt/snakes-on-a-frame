@@ -2,6 +2,7 @@ import pytest
 
 import snakes
 from snakes import Snake, SnakeBody, SnakeHead, Frame, Cardinal, Apple, Position, GameOver
+from typing import Deque
 
 
 @pytest.mark.parametrize("direction, expected_xy", (
@@ -42,3 +43,25 @@ def test_edge_detection(direction):
     frame = Frame(Snake(SnakeHead(Position(0,0), direction), []), None, 1, 1)
     with pytest.raises(GameOver):
         snakes.next_frame(frame=frame, player_input=None)
+
+
+@pytest.mark.parametrize("snake_body, expected_body", (
+    (
+        [SnakeBody(Position(0,7))],
+        [SnakeBody(Position(0,8))]
+    ),
+    (
+        [SnakeBody(Position(0,7)), SnakeBody(Position(1,7))],
+        [SnakeBody(Position(0,8)), SnakeBody(Position(0,7))]
+    ),
+))
+def test_move_body(snake_body, expected_body):
+    frame = Frame(snake=Snake(head=SnakeHead(Position(0, 8), Cardinal.UP), body=Deque(snake_body)), apple=None, width=5, height=10)
+    expected_frame = Frame(snake=Snake(head=SnakeHead(Position(0, 9), Cardinal.UP), body=Deque(expected_body)), apple=None, width=5, height=10)
+    assert snakes.next_frame(frame, None) == expected_frame
+
+
+def test_eat_apple():
+    frame = Frame(snake=Snake(head=SnakeHead(Position(0, 7), Cardinal.UP), body=Deque([SnakeBody(Position(0,6))])), apple=Apple(Position(0, 8)), width=5, height=10)
+    expected_frame = Frame(snake=Snake(head=SnakeHead(Position(0, 8), Cardinal.UP), body=Deque([SnakeBody(Position(0, 7)), SnakeBody(Position(0,6))])), apple=None, width=5, height=10)
+    assert snakes.next_frame(frame, None) == expected_frame

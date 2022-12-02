@@ -1,6 +1,7 @@
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Deque
 
 class Cardinal(Enum):
     UP = 1
@@ -36,7 +37,7 @@ class SnakeBody(Entity):
 @dataclass
 class Snake:
     head: SnakeHead
-    body: List[SnakeBody]
+    body: Deque[SnakeBody]
 
 
 @dataclass
@@ -54,7 +55,7 @@ class Frame:
 
 STD_WIDTH = 80
 STD_HEIGHT = 20
-BORING_FRAME = Frame(Snake(SnakeHead(Position(0,0), Cardinal.UP), []), Apple(Position(STD_WIDTH - 1, STD_HEIGHT - 1)), STD_WIDTH, STD_HEIGHT)
+BORING_FRAME = Frame(Snake(SnakeHead(Position(0,0), Cardinal.UP), Deque()), Apple(Position(STD_WIDTH - 1, STD_HEIGHT - 1)), STD_WIDTH, STD_HEIGHT)
 
 def head_char(cardinal: Cardinal) -> str:
     if cardinal == Cardinal.UP:
@@ -146,11 +147,19 @@ class GameOver(Exception):
 # If the snake *can* change to the direction of the player input it does so
 # The snake changes direction *before* it moves
 #
+# The snake eats an apple like so, on the frame where the snake head would move
+# onto the apple, we remove the apple from the frame and inject an additional body
+# segment into the tail
+#  --> a
+#  -->a
+#  --->
 def next_frame(frame: Frame, player_input: Optional[Cardinal]) -> Frame:
     if player_input is not None and is_legal_input(frame.snake.head.facing, player_input):
         frame.snake.head.facing = player_input
     
     snake_direction = frame.snake.head.facing
+
+    old_head_pos = dataclasses.replace(frame.snake.head.pos)
 
     if snake_direction == Cardinal.UP:
         frame.snake.head.pos.y += 1
@@ -160,6 +169,22 @@ def next_frame(frame: Frame, player_input: Optional[Cardinal]) -> Frame:
         frame.snake.head.pos.x += 1
     if snake_direction == Cardinal.LEFT:
         frame.snake.head.pos.x -= 1
+    
+
+    
+    head_on_apple = frame.apple and frame.snake.head.pos == frame.apple.pos
+
+    if head_on_apple or frame.snake.body:
+        tail = SnakeBody(old_head_pos)
+        frame.snake.body.appendleft(tail)
+        
+    # Do we want to refactor this some more in particular the elif is necesasary
+    # because we should only pop the tail if we did not inject the neck
+    if head_on_apple:
+        frame.apple = None
+    elif frame.snake.body:
+        frame.snake.body.pop()
+
     
     new_x,new_y = frame.snake.head.pos.as_tuple()
     if new_x < 0:
