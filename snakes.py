@@ -1,4 +1,5 @@
 import dataclasses
+import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Deque
@@ -142,6 +143,12 @@ if __name__ == "__main__":
 class GameOver(Exception):
     pass
 
+class HitEdgeOfScreen(GameOver):
+    pass
+
+class BitYourOwnTail(GameOver):
+    pass
+
 ## Assumptions:
 # The snake moves every frame
 # If the snake *can* change to the direction of the player input it does so
@@ -153,6 +160,19 @@ class GameOver(Exception):
 #  --> a
 #  -->a
 #  --->
+
+# Hitting my own tail, we won't count it as a hit if you move
+# onto the same square as your tail moved out of in the same frame
+#     |
+# --> |
+# |----
+
+#     
+# --->|
+# |----
+
+# ---->
+# |----
 def next_frame(frame: Frame, player_input: Optional[Cardinal]) -> Frame:
     if player_input is not None and is_legal_input(frame.snake.head.facing, player_input):
         frame.snake.head.facing = player_input
@@ -181,20 +201,22 @@ def next_frame(frame: Frame, player_input: Optional[Cardinal]) -> Frame:
     # Do we want to refactor this some more in particular the elif is necesasary
     # because we should only pop the tail if we did not inject the neck
     if head_on_apple:
-        frame.apple = None
+        frame.apple.pos = new_apple_position(frame)
     elif frame.snake.body:
         frame.snake.body.pop()
 
     
     new_x,new_y = frame.snake.head.pos.as_tuple()
     if new_x < 0:
-        raise GameOver
+        raise HitEdgeOfScreen
     if new_x >= frame.width:
-        raise GameOver
+        raise HitEdgeOfScreen
     if new_y < 0:
-        raise GameOver
+        raise HitEdgeOfScreen
     if new_y >= frame.height:
-        raise GameOver
+        raise HitEdgeOfScreen
+    if frame.snake.head.pos in (segment.pos for segment in frame.snake.body):
+        raise BitYourOwnTail
 
     return frame
 
@@ -203,3 +225,11 @@ def is_legal_input(current_facing: Cardinal, player_input: Cardinal):
     # Disallow 180 degree turns. 
     # This works because the difference between up/down and left/right is always 2.
     return abs(current_facing.value - player_input.value) != 2
+
+
+def new_apple_position(frame: Frame) -> Position:
+    all_positions = {(x,y) for x in range(frame.width) for y in range(frame.height)}
+    valid_positions = all_positions - {segment.pos.as_tuple() for segment in frame.snake.body}
+    valid_positions.remove(frame.snake.head.pos.as_tuple())
+
+    return Position(*random.choice(tuple(valid_positions)))
